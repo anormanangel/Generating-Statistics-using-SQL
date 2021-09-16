@@ -1,0 +1,27 @@
+--CHECKING IF THE DATA LOADED CORRECTLY
+select * from rides limit 10;
+
+--CHANGING TIME ZONE FROM UCT TO EAT
+select inserted_at, (to_timestamp(droppedoff_at, 'YYYY-MM-DD HH24:MI:SS') at time zone  'EAT') at  time zone 'UTC'from rides;
+
+--NUMBER OF COMPLETED RIDES IN NAIROBI ON OCTOBER 11, 2019
+select count(id) from rides where city_id=2 and droppedoff_at is not null and inserted_at=TO_DATE('2019-10-11', 'YYYY-MM-DD');
+--ANSWER = 289
+
+--NUMBER OF UNIQUE PASSENGERS WHO COMPLETED RIDES IN NAIROBI ON OCTOBER 11, 2019
+select count (distinct(passenger_id)) from rides where city_id=2 and 
+droppedoff_at is not null and inserted_at=TO_DATE('2019-10-11', 'YYYY-MM-DD');
+--ANSWER: 286
+
+--NUMBER OF COMPLETED RIDES WHERE AT LEAST SOME PART OF THE TRIP WAS PAID USING SAFEBODA CASHLESS CREDIT IN NAIROBI ON OCTOBER 11, 2019 
+select count(r.id) from rides r, payments p where r.id = p.ride_id and
+r.droppedoff_at is not null and r.city_id = 2 and p.payment_type='credit' and r.inserted_at=TO_DATE('2019-10-11', 'YYYY-MM-DD');
+--ANSWER: 86
+
+--NUMBER OF UNIQUE PASSENGERS WHO PAID SOME OF THEIR RIDES USING CASHLESS IN NAIROBI ON OCTIBER 11, 2019 
+select count(distinct(r.passenger_id)) from rides r, payments p where r.id = p.ride_id and p.payment_type='credit' and r.city_id=2 and r.inserted_at=TO_DATE('2019-10-11', 'YYYY-MM-DD');
+--ANSWER: 86
+
+
+
+
