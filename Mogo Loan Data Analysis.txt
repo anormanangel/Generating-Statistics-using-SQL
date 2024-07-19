@@ -1,0 +1,132 @@
+
+-- TASK 1:
+
+-- Step 1: Count of loans that reach DPD 30
+SELECT 
+    COUNT(*) AS DPD30_Count,
+    SUM(loan_amount) AS DPD30_Issued_Amount
+FROM 
+    [db-tst].[sratsk].[loan_data]
+WHERE 
+    loan_status != 5
+    AND DATEDIFF(day, due_date, GETDATE()) >= 30;
+   
+   
+ -- Step 2: Total count and issued amount of all loans
+ SELECT 
+    COUNT(*) AS Total_Loans,
+    SUM(Loan_amount) AS Total_Issued_Amount
+FROM 
+    [db-tst].[sratsk].[loan_data];
+   
+   
+-- Calculate the count & percentage of loans that reach DPD 30
+SELECT 
+    DPD30_Count,
+    DPD30_Issued_Amount,
+    Total_Loans,
+    Total_Issued_Amount,
+    ROUND((DPD30_Count * 100.0 / Total_Loans), 1) AS DPD30_Percentage_Count,
+    ROUND((DPD30_Issued_Amount * 100.0 / Total_Issued_Amount), 1) AS DPD30_Percentage_Issued_Amount
+FROM(
+    SELECT 
+        (SELECT COUNT(*) 
+         FROM [db-tst].[sratsk].[loan_data] 
+         WHERE loan_status != 5 
+           AND DATEDIFF(day, due_date, GETDATE()) >= 30) AS DPD30_Count,
+        (SELECT SUM(loan_amount) 
+         FROM [db-tst].[sratsk].[loan_data] 
+         WHERE loan_status != 5 
+           AND DATEDIFF(day, due_date, GETDATE()) >= 30) AS DPD30_Issued_Amount,
+        (SELECT COUNT(*) 
+         FROM [db-tst].[sratsk].[loan_data]) AS Total_Loans,
+        (SELECT SUM(loan_amount) 
+         FROM [db-tst].[sratsk].[loan_data]) AS Total_Issued_Amount
+) AS subquery;
+
+
+--  Identify any monthly trends in DPO loans
+SELECT 
+    YEAR(Start_date) AS Year, 
+    MONTH(Start_date) AS Month,
+    COUNT(*) AS DPD30_Count,
+    SUM(Loan_amount) AS DPD30_Issued_Amount
+FROM 
+    [db-tst].[sratsk].[loan_data]
+WHERE 
+    Loan_status != 5
+    AND DATEDIFF(day, Due_date, GETDATE()) >= 30
+GROUP BY 
+    YEAR(Start_date), MONTH(Start_date)
+ORDER BY 
+    Year, Month;
+   
+
+--TASK 2
+--Step 1: Calculate outstanding amount at DPD 30 
+SELECT 
+    ld.Loan_id,
+    ld.Loan_amount AS Outstanding_Amount,
+    (SELECT SUM(pd.Paid_principal + pd.Paid_fines + pd.Paid_other) 
+     FROM [db-tst].[sratsk].[payment_data] pd
+     WHERE pd.Loan_id = ld.Loan_id
+       AND pd.Payment_date <= DATEADD(day, 30, ld.Due_date)) AS Recovered_Amount
+FROM 
+    [db-tst].[sratsk].[loan_data] ld
+WHERE 
+    ld.Loan_status != 5
+    AND DATEDIFF(day, ld.Due_date, GETDATE()) >= 30;
+   
+--Step 2: Aggregate recovered vs. outstanding amounts to measure DC success
+SELECT 
+    SUM(Recovered_Amount) AS Total_Recovered_Amount,
+    SUM(Outstanding_Amount) AS Total_Outstanding_Amount,
+    (SUM(Recovered_Amount) * 100.0 / SUM(Outstanding_Amount)) AS Recovery_Percentage
+FROM (
+    SELECT 
+        ld.Loan_id,
+        ld.Loan_amount AS Outstanding_Amount,
+        (SELECT SUM(pd.Paid_principal + pd.Paid_fines + pd.Paid_other) 
+         FROM [db-tst].[sratsk].[payment_data] pd
+         WHERE pd.Loan_id = ld.Loan_id
+           AND pd.Payment_date <= DATEADD(day, 30, ld.Due_date)) AS Recovered_Amount
+    FROM 
+        [db-tst].[sratsk].[loan_data] ld
+    WHERE 
+        ld.Loan_status != 5
+        AND DATEDIFF(day, ld.Due_date, GETDATE()) >= 30
+) AS subquery;
+
+-- Step 3: Identify segments with better or worse recovery rates
+-- Example: Segment by Scoring_score
+SELECT 
+    Scoring_score,
+    SUM(Recovered_Amount) AS Total_Recovered_Amount,
+    SUM(Outstanding_Amount) AS Total_Outstanding_Amount,
+    (SUM(Recovered_Amount) * 100.0 / SUM(Outstanding_Amount)) AS Recovery_Percentage
+FROM (
+    SELECT 
+        ld.Loan_id,
+        ld.Scoring_score,
+        ld.Loan_amount AS Outstanding_Amount,
+        (SELECT SUM(pd.Paid_principal + pd.Paid_fines + pd.Paid_other) 
+         FROM [db-tst].[sratsk].[payment_data] pd
+         WHERE pd.Loan_id = ld.Loan_id
+           AND pd.Payment_date <= DATEADD(day, 30, ld.Due_date)) AS Recovered_Amount
+    FROM 
+        [db-tst].[sratsk].[loan_data] ld
+    WHERE 
+        ld.Loan_status != 5
+        AND DATEDIFF(day, ld.Due_date, GETDATE()) >= 30
+) AS subquery
+GROUP BY 
+    Scoring_score
+ORDER BY 
+    Recovery_Percentage DESC;
+
+
+   
+ 
+
+
+
